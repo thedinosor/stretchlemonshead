@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Stretchy Head</title>
+    <link rel="stylesheet" type="text/css" href="styles.css">
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        background-color: #f0f0f0;
+      }
+
+      #stretch-info {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        font-family: Arial, sans-serif;
+        font-size: 16px;
+        background-color: rgba(255, 255, 255, 0.8);
+        padding: 10px;
+        border-radius: 5px;
+      }
+
+      @keyframes bounce {
+        0% {
+          transform: translate(-50%, -50%) scale(1);
+        }
+        20% {
+          transform: translate(-50%, -50%) scale(1.2);
+        }
+        40% {
+          transform: translate(-50%, -50%) scale(0.8);
+        }
+        60% {
+          transform: translate(-50%, -50%) scale(1.1);
+        }
+        80% {
+          transform: translate(-50%, -50%) scale(0.9);
+        }
+        100% {
+          transform: translate(-50%, -50%) scale(1);
+        }
+      }
+
+      @keyframes wobble {
+        0% {
+          transform: translate(-50%, -50%) rotate(0deg);
+        }
+        25% {
+          transform: translate(-50%, -50%) rotate(5deg);
+        }
+        50% {
+          transform: translate(-50%, -50%) rotate(-5deg);
+        }
+        75% {
+          transform: translate(-50%, -50%) rotate(3deg);
+        }
+        100% {
+          transform: translate(-50%, -50%) rotate(0deg);
+        }
+      }
+
+      .bouncy {
+        animation: bounce 0.5s ease-in-out;
+      }
+
+      .wobbly {
+        animation: wobble 0.1s ease-in-out infinite alternate;
+      }
+
+      .disable-stretch {
+        pointer-events: none;
+      }
+
+      .fade-out {
+        animation: fade-out 1s linear;
+      }
+
+      @keyframes fade-out {
+        0% {
+          volume: 1;
+        }
+        100% {
+          volume: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stretch-info">
+      <div>Stretch the head</div>
+      <div id="stretch-percentage">Stretched: 100%</div>
+    </div>
+    <img id="head" src="head.png" alt="Stretchy Head" style="width: 800px; height: 600px;">
+    <audio id="stretch-audio" src="stretching.mp3" loop></audio>
+    <audio id="letgo-audio" src="letgosound.mp3"></audio>
+    <audio id="scream-audio" src="scream.mp3"></audio>
+    <audio id="explotano-audio" src="explotano.mp3"></audio>
+    <script>
+      const head = document.getElementById('head');
+      const stretchInfo = document.getElementById('stretch-percentage');
+      const stretchAudio = document.getElementById('stretch-audio');
+      const letgoAudio = document.getElementById('letgo-audio');
+      const screamAudio = document.getElementById('scream-audio');
+      const explotanoAudio = document.getElementById('explotano-audio');
+      let isDragging = false;
+      let isStretching = false;
+      let startX, startY, originalSize;
+      let originalLeft, originalTop;
+      let lastPercentage = 100; // To track the last percentage before letting go
+      let above300Timer = null; // Timer for holding above 300%
+      let above300StartTime = null; // Start time when stretch goes above 300%
+      const above300Duration = 7000; // 7 seconds in milliseconds
+
+      // Define the original size and dimensions of the head.png
+      originalSize = {
+        width: parseFloat(getComputedStyle(head).width),
+        height: parseFloat(getComputedStyle(head).height),
+      };
+
+      head.addEventListener('mousedown', (event) => {
+        if (!head.classList.contains('disable-stretch')) {
+          isDragging = true;
+          startX = event.clientX;
+          startY = event.clientY;
+          originalLeft = parseFloat(getComputedStyle(head).left);
+          originalTop = parseFloat(getComputedStyle(head).top);
+        }
+      });
+
+      document.addEventListener('mousemove', (event) => {
+        if (isDragging) {
+          const deltaX = event.clientX - startX;
+          const deltaY = event.clientY - startY;
+          const newWidth = Math.max(1, originalSize.width + deltaX * 2);
+          const newHeight = Math.max(1, originalSize.height + deltaY * 2);
+          head.style.width = `${newWidth}px`;
+          head.style.height = `${newHeight}px`;
+
+          if (deltaX !== 0 || deltaY !== 0) {
+            isStretching = true;
+            stretchAudio.play();
+
+            const stretchPercentage = Math.round((newWidth / originalSize.width) * 100);
+
+            // Check if stretch percentage is above 300
+            if (stretchPercentage > 300 && lastPercentage <= 300 && above300Timer === null) {
+              above300StartTime = Date.now();
+              above300Timer = setTimeout(() => {
+                above300Timer = null;
+                above300StartTime = null;
+                screamAudio.pause();
+                screamAudio.currentTime = 0; // Reset scream audio
+                explotanoAudio.play();
+                setTimeout(() => {
+                  alert("Look at the mess you've made :-[");
+                }, 3000); // Delay alert for 2 seconds after explotano audio finishes
+              }, above300Duration);
+              screamAudio.play();
+            } else if (stretchPercentage <= 300 && above300Timer !== null) {
+              // Cancel timer if stretch percentage goes below 300%
+              clearTimeout(above300Timer);
+              above300Timer = null;
+              above300StartTime = null;
+              screamAudio.pause();
+              screamAudio.currentTime = 0; // Reset scream audio
+            }
+
+            stretchInfo.innerText = `Stretched: ${stretchPercentage}%`;
+            lastPercentage = stretchPercentage;
+
+            // Apply wobble effect based on time passed
+            if (above300StartTime !== null) {
+              const elapsedTime = Date.now() - above300StartTime;
+              const wobbleIntensity = (elapsedTime / above300Duration) * 20; // Maximum 20 degrees rotation
+              head.style.transform = `translate(-50%, -50%) rotate(${wobbleIntensity}deg)`;
+            }
+          }
+        }
+      });
+
+      document.addEventListener('mouseup', () => {
+        if (isDragging) {
+          isDragging = false;
+          if (isStretching) {
+            stretchAudio.pause();
+            stretchAudio.currentTime = 0; // Reset audio to start
+
+            // Play letgo sound with fade out effect when bounce animation starts playing
+            letgoAudio.classList.add('fade-out');
+            letgoAudio.play();
+
+            // Disable stretching temporarily during bounce animation
+            head.classList.add('disable-stretch');
+
+            // Bouncy animation and return to center
+            head.classList.add('bouncy');
+            setTimeout(() => {
+              head.style.width = `${originalSize.width}px`;
+              head.style.height = `${originalSize.height}px`;
+              head.style.left = `${originalLeft}px`;
+              head.style.top = `${originalTop}px`;
+              head.classList.remove('bouncy');
+              stretchInfo.innerText = `Stretched: 100%`;
+              head.style.transform = `translate(-50%, -50%) rotate(0deg)`; // Reset rotation
+
+              // Enable stretching after bounce animation completes
+              setTimeout(() => {
+                head.classList.remove('disable-stretch');
+              }, 200); // Matches the duration of the bounce animation
+            }, 600); // Matches the duration of the bounce animation
+          }
+          isStretching = false;
+
+          // Reset timer and audio if stretch percentage was above 300%
+          if (above300Timer !== null) {
+            clearTimeout(above300Timer);
+            above300Timer = null;
+            above300StartTime = null;
+            screamAudio.pause();
+            screamAudio.currentTime = 0; // Reset scream audio
+          }
+
+          // Reset lastPercentage to 100 when mouse is released
+          lastPercentage = 100;
+        }
+      });
+    </script>
+  </body>
+</html>
